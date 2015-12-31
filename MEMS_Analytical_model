@@ -1,0 +1,240 @@
+%    BIMORPH
+
+%    |-------------------------------------------------------------------|
+%    |//////////////////////////// Titanium /////////////////////////////|
+%    |-------------------------------------------------------------------|
+%    |//////////////////////////// Platinum /////////////////////////////|
+%    |-------------------------------------------------------------------|
+%    |                               PZT-4                               |
+%    |-------------------------------------------------------------------|
+%    |//////////////////////////// Platinum /////////////////////////////|
+%    |-------------------------------------------------------------------|
+%    |                               PZT-4                               |
+%    |-------------------------------------------------------------------|
+%    |//////////////////////////// Platinum /////////////////////////////|
+%    |-------------------------------------------------------------------|
+%    |//////////////////////////// Titanium /////////////////////////////|
+%    |-------------------------------------------------------------------|
+%    |////////////////////////////// SiO2 ///////////////////////////////|
+%    |-------------------------------------------------------------------|
+%    |/////////////////////////////// Si ////////////////////////////////|
+%    |-------------------------------------------------------------------|
+
+function main
+
+    % --------------------------------------------------------------------
+    % CONSTANTS / PARAMETERS
+    % --------------------------------------------------------------------
+
+    % Physics constants
+    ep_0 = 8.85e-12; % Farads per meter
+    g = 9.81; % Newtons per kilogram
+
+    % PZT-4
+    ep_PZT4 = 1300; % relative permittivity
+    E_PZT4 = 110e9; % Pa, elastic modulus
+    rho_PZT4 = 7500; %kg/m^3, density
+    e33_PZT4 = 15.1; % C/m^2, piezoelectric coefficient, longitudinal
+    e31_PZT4 = -5.2; % C/m^2, piezoelectric coefficient, transverse
+    
+    % Silicon Constants
+    E_Si110 = 170e9; % Pa, elastic modulus
+    rho_Si= 2330; %kg/m^3
+    
+    % SiO2
+    E_Si110 = 170e9; % Pa, elastic modulus
+    rho_SiO2= 70 ; % kg/m^3
+       
+    % Titanium Constants
+    E_Ti = 110e9; % Pa, elastic modulus
+    rho_Ti = 4506; %kg/m^3
+    
+    % Platinum Constants
+    E_Pt = 168e9; % Pa, elastic modulus
+    rho_Pt = 21450; %kg/m^3
+    
+    % Stack Elastic Moduli  [top .... bottom]
+    E = [E_Pt E_PZT4 E_Pt E_PZT4 E_Pt];
+
+    % Cantilever Geometry [637 Hz]
+    L = 2400e-6; % um, beam length
+    w = 1650e-6; % um, cantilever beam width
+    t_E1 = 0.3e-6; % um, Electrode 1 thickness
+    t_E2 = 2.2e-6; % um, Electrode 2 thickness
+    t_p1 = 5e-6; % um, piezoelectric material 1 thickness
+    t_E3 = 2.5e-6; % um, Electrode 3 thickness
+    t_p2 = 5e-6; % um, piezoelectric material 2 thickness
+    t_E4 = 2.2e-6; % um, Electrode 4 thickness
+    t_E5 = 0.3e-6; % um, Electrode 5 thickness
+    t_S1 = 2e-6; % um, Structural material 1 thickness
+    t_S2 = 10e-6; % um, Structural material 2 thickness
+    t = [t_E1 t_E2 t_p1 t_E3 t_p2 t_E4 t_E5 t_S1 t_S2]; % Stack thicknesses  [top .... bottom]
+
+%     % Cantilever Geometry [637 Hz]
+%     L = 3000e-6; % um, beam length
+%     w = 3000e-6; % um, cantilever beam width
+%     t_E1 = 2.5e-6; % um, Electrode 1 thickness
+%     t_p1 = 100e-6; % um, piezoelectric material 1 thickness
+%     t_E2 = 2.5e-6; % um, Electrode 2 thickness
+%     t_p2 = 100e-6; % um, piezoelectric material 2 thickness
+%     t_E3 = 2.5e-6; % um, Electrode 3 thickness
+%     t = [t_E1 t_p1 t_E2 t_p2 t_E3]; % Stack thicknesses  [top .... bottom]
+    
+    % X-coordinates of centroids for area moment calculation
+    h_E1 = (t_E3 + 2*t_p1 + 2*t_E2 + t_E1)/2;                     % centroid of Electrode 1
+    h_E2 = (t_E3 + 2*t_p1 + t_E2)/2;                              % centroid of Electrode 2
+    h_p1 = (t_E3 + t_p1)/2;                                       % centroid of piezo mat 1
+    h_E3 = 0;                                                     % centroid of Electrode 2
+    h_p2 = -(t_E3 + t_p2)/2;                                      % centroid of piezo mat 2
+    h_E4 = -(t_E3 + 2*t_p2 + t_E4)/2;                             % centroid of Electrode 4
+    h_E5 = -(t_E3 + 2*t_p2 + 2*t_E4 + t_E5)/2;                    % centroid of Electrode 5
+    h_S1 = -(t_E3 + 2*t_p2 + 2*t_E4 + 2*t_E5 + t_S1)/2;           % centroid of Electrode 5
+    h_S2 = -(t_E3 + 2*t_p2 + 2*t_E4 + 2*t_E5 + 2*t_S1 + t_S2)/2;  % centroid of Electrode 5 
+    h =  [h_E1 h_p1 h_E2 h_p2 h_E3];            % Stack centroid coordinates  [top .... bottom]
+    hn = centerOfGravity(w, E, t, h); % centroid (contained by plane of zero stress)
+
+    % --------------------------------------------------------------------
+    % MECHANICS
+    % --------------------------------------------------------------------
+    
+    % Compute area moment for laminant composite
+    In = areaMoment(w, E, t, h)
+    
+    % Proof mass geometry
+    Lm = 1000e-6; % um, mass length
+    hm = 1000e-6; % um, mass height
+    wm = 3000e-6; % um, cantilever beam width
+    
+    % Input Force Due to Proof Mass
+    G = 100; % G's Range: 100-2900 on radius, on wall 10-100
+    m = rho_Si*Lm*hm*wm % kg, effective mass
+    a = G*g; % m/s^2, effective acceleration
+    Fm = m*a; % N, Applied force
+    
+    % Input Force Due to Beam Mass
+    mb = (L+Lm)*w*(rho_Pt*(t_E1+t_E2+t_E3) + rho_PZT4*(t_p1+t_p2));
+    Fb = mb*a;
+    
+    % Total Effective Force
+    Ft = Fm;
+    
+    % Effective Spring Constant and Resonant Frequency for the Cantilever
+    En = max(E) % Effective young's modulus
+    x_max1 = (5/48)*Fb*L^3/(En*In); % max displacement due to beam's mass
+    x_max2 = Fm*L^3/(3*En*In) + Fm*L^2*Lm/(4*En*In); % max displacement due to proof mass
+    x_max = x_max1 + x_max2 % Apply superpostion
+    keff = Ft/x_max % Will give an over estimate of the deflection and resonant frequency
+    wn = sqrt(keff/m); % natural angular frequency
+    fn = wn/(2*pi) % natural frequency in Hz
+    T_max= 3*En*sum(t)/(2*L^2)*x_max  % max stress at Y=0
+    
+    % Average Strain in each piezoelectric material
+    S_avg1 = Ft.*(h_p1 - hn).*L/(2.*In.*En);
+    S_avg2 = Ft.*(h_p2 - hn).*L/(2.*In.*En);
+    
+    % --------------------------------------------------------------------
+    % DYNAMIC RESPONSE
+    % --------------------------------------------------------------------
+    
+    % Compute quality factor
+    Q = 1000; % for Si
+    
+    % Frequencies
+    freq = linspace(0,10e6,10e6); % Input Frequencies  in Hz
+    omega=freq*2*pi;   % Input frequencies in rad/sec 
+    s=1i*omega;        % Complex angular frequency
+    
+    % Transfer Function for Impulse Response
+    Hi = 1./(m*(s.^2+s.*wn./Q+wn.^2));
+    
+    % Max displacement of proof mass as a function of frequency
+    x = abs(Hi*Ft);
+    
+    % --------------------------------------------------------------------
+    % ELECTRICAL OUTPUT
+    % --------------------------------------------------------------------
+    
+    % Total motional current
+    Fdisp = keff*x; % force as a function of frequency
+    imot1 = abs(s.*Fdisp*e31_PZT4*(w*(E_PZT4/En)*t_p1)*L/(2*En*In)*(h_p1-hn));
+    imot2 = abs(s.*Fdisp*e31_PZT4*(w*(E_PZT4/En)*t_p2)*L/(2*En*In)*(h_p2-hn));
+    imot = imot1 + imot2;
+    
+    %----------------------------------------------------------------------
+    %                                  POWER
+    %----------------------------------------------------------------------
+    Zt = 1/(2*Q); %
+    d31 = e31_PZT4.*S_avg1 % piezoelectric strain constant (~1.8e-10 m/V Reported)
+    K = 0.26 % Electromechanical Coupling Constant
+    C = 2*ep_PZT4*ep_0*L*w/t_p1 % Farads, Device Capacitance
+    Ropt = 1/(wn*C)*sqrt(1/(1+Q^2*K^4)) % Optimal Load at Output
+    Vo = (16/9).* ((-d31.*t_p1.*En.*h_E1.*a)/(ep_PZT4.*L.^2.*Zt.*wn.^2)) % Output Voltage)
+    Pe = (9/(64.*Ropt)).*((-d31.*t_p1.*En.*h_E1.*a)/(ep_PZT4.*L.^2.*Zt.*wn.^2)).^2 % (Electrical)
+    Pm = (m+mb)*a^2/(4*wn*Zt) % Mechanical (Theoretical Upper Limit)
+    Pe_Density = Pe/(sum(t)*w*L)*10^-3 % Power Density (Electrical)
+    Pm_Density = Pm/(sum(t)*w*L)*10^-3 % Power Density (Mechanical - Maximum Theoretical, from Energy Balance)
+       
+    %----------------------------------------------------------------------
+    
+%     figure;
+%     semilogx(freq,abs(P))
+%     title('Electrical Power vs. Frequency');
+%     xlabel('Frequency [Hz]');
+%     ylabel('Electrical Power [W]');
+%     
+%     figure;
+%     semilogx(freq,abs(p))
+%     title('Electrical Power Density vs. Frequency');
+%     xlabel('Frequency [Hz]');
+%     ylabel('Electrical Power Density [W/m^3]');
+    
+    % --------------------------------------------------------------------
+    % PLOTS
+    % --------------------------------------------------------------------
+    
+    % Displacement Plot
+%     figure;
+%     semilogx(freq,x*1e6);
+%     title('Bimorph Response: Proof Mass Displacement vs. Frequency');
+%     ylabel('Frequency [Hz]');
+%     ylabel('Cantilever Tip Displacement [\mum]');
+    
+    % Current Plot
+%     figure;
+%     semilogx(freq,imot);
+%     title('Bimorph Response: Motional Current vs. Frequency');
+%     ylabel('Frequency [Hz]');
+%     ylabel('MotionalCurrent [Amps]');
+    
+    
+
+end
+
+% E, t, and h are expected to be lists of the same size. W is a constant.
+% This function computes a center of gravity for a laminated material using
+% the effective width method.
+function result = centerOfGravity(W, E, t, h)
+    n = length(E);
+    En = max(E);
+    weightedArea = 0;
+    totalArea = 0;
+    for i = 1:n
+         weightedArea = weightedArea + W*(E(i)/En)*t(i)*h(i);
+         totalArea = totalArea + W*(E(i)/En);
+    end
+    result = weightedArea/totalArea;
+end
+
+% E, t, and h are expected to be lists of the same size. W is a constant.
+% This function computes the areaMoment of inertia (Y-Direction) using the
+% effective width method.
+function result = areaMoment(W, E, t, h)
+    n = length(E);
+    En = max(E);
+    hn = centerOfGravity(W, E, t, h);
+    Iny = 0;
+    for i = 1:n
+         Iny = Iny + (W*(E(i)/En)*t(i)^3)/12 + W*(E(i)/En)*t(i)*(hn - h(i))^2;
+    end
+    result = Iny;
+end
